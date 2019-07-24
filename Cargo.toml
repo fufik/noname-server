@@ -1,0 +1,8 @@
+[package]
+name = "noname-server"
+version = "0.1.0"
+authors = ["fufik"]
+edition = "2018"
+
+[dependencies]
+regex="1"
