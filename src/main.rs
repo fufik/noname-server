@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::fs;
+use std::path::Path;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::net::TcpListener;
@@ -26,6 +27,7 @@ fn handle_connection(mut stream: TcpStream){
     };
 
     let mut err_answer = |Code: (u16,&str)|{
+        println!("Error: {} {}.",Code.0,Code.1);
         let contents = fs::read_to_string(format!("errors/{}.html",Code.0)).unwrap();
         answer(Code,contents);
     };
@@ -52,7 +54,6 @@ fn handle_connection(mut stream: TcpStream){
                 };
             },
             None    =>  {
-                println!("400 Bad request");
                 err_answer((400,"Bad request"));
                 return;
             },
@@ -63,17 +64,23 @@ fn handle_connection(mut stream: TcpStream){
         {
             contents = fs::read_to_string("index.html").unwrap();
         } else {
-            let fname = &address[1..];
+            let fname = &address[1..]; 
+            let ext = match Path::new(&fname).extension(){
+                Some(osstr) => osstr.to_str().unwrap(),
+                None        => "html"
+            };
+            println!("{}",ext);
             //println!("{}",fname);
-            let a = fs::read_to_string(fname);
-            match a{
-                Ok(n)  => contents = n,
-                Err(_) => {
-                    println!("404 Not Found");
-                    err_answer((404,"Not found"));
-                    return;
-                },
-            }
+            if(ext == "html"){
+                let a = fs::read_to_string(fname);
+                match a{
+                    Ok(n)  => contents = n,
+                    Err(_) => {
+                        err_answer((404,"Not found"));
+                        return;
+                    },
+                }
+            } //TODO images
         }
         answer((200,"OK"),contents);
     }
