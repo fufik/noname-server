@@ -1,19 +1,24 @@
 use regex::Regex;
 use std::fs;
 use std::path::Path;
+use std::thread;
 use std::io::prelude::*;
+use std::time::Duration;
 use std::net::TcpStream;
 use std::net::TcpListener;
-
+use noname_server::ThreadPool;
 fn main() {
-    println!("Rust server version 0.1 is up on port 7878");
+    println!("Rust server version 0.2 is up on port 7878");
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(5);
+
     for stream in listener.incoming(){
         let stream = stream.unwrap();
-        println!("Connection established with {}",stream.peer_addr().unwrap());
-        handle_connection(stream);
+        println!("CON:Connection established with {}",stream.peer_addr().unwrap());
+        pool.execute(||{
+            handle_connection(stream);
+        });
     }
-
 }
 
 
@@ -24,12 +29,12 @@ fn handle_connection(mut stream: TcpStream){
     let mut answer = move |Code: (u16,&str), contents: String|{
         if Code.0!=200 
             {println!("ERR: {} {}.",Code.0,Code.1);}
-        else 
-            {println!("SUC!");}
+        //else 
+           // {println!("SUC!");}
         let response = format!("HTTP/1.1 {} {}\r\n\r\n{}", Code.0,Code.1, contents);
         stream.write(response.as_bytes()).unwrap();
         stream.flush().unwrap();
-        println!("Connection closed with {}",stream.peer_addr().unwrap());
+        println!("CON:Connection closed with {}",stream.peer_addr().unwrap());
     };
 
     let mut err_answer = |Code: (u16,&str)|{
