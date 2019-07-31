@@ -26,19 +26,27 @@ fn handle_connection(mut stream: TcpStream){
     let mut buffer = [0;512];
     stream.read(&mut buffer).unwrap();
 
-    let mut answer = move |Code: (u16,&str), contents: String|{
+    let mut answer = move |Code: (u16,&str), mut contents: Vec<u8>|{
         if Code.0!=200 
             {println!("ERR: {} {}.",Code.0,Code.1);}
         //else 
            // {println!("SUC!");}
-        let response = format!("HTTP/1.1 {} {}\r\n\r\n{}", Code.0,Code.1, contents);
-        stream.write(response.as_bytes()).unwrap();
+        let mut response: Vec<u8> = format!("HTTP/1.1 {} {}\r\n\r\n", Code.0,Code.1).into_bytes();
+        response.append(&mut contents);
+        println!("{}",String::from_utf8_lossy(&response));
+        match stream.peer_addr(){
+            Ok(a) =>  println!("CON:Connection closed with {}", a),
+            Err(e) => {
+                 println!("CON:Connection closed with Pr",);
+            },
+        }
+        stream.write(&response).unwrap();
         stream.flush().unwrap();
-        println!("CON:Connection closed with {}",stream.peer_addr().unwrap());
+       
     };
 
     let mut err_answer = |Code: (u16,&str)|{
-        let contents = fs::read_to_string(format!("errors/{}.html",Code.0)).unwrap();
+        let contents = fs::read_to_string(format!("errors/{}.html",Code.0)).unwrap().into_bytes();
         answer(Code,contents);
     };
 
@@ -69,11 +77,11 @@ fn handle_connection(mut stream: TcpStream){
             },
         }
         
-        let mut contents = String::new();
+        let mut contents: Vec<u8> = Vec::new();
         if address == "/"
         {
             println!("REQ: index.html");
-            contents = fs::read_to_string("index.html").unwrap();
+            contents = fs::read_to_string("index.html").unwrap().into_bytes();
         } else {
             let fname = &address[1..]; 
             println!("REQ: {}",fname);
@@ -85,16 +93,28 @@ fn handle_connection(mut stream: TcpStream){
                 Some(osstr) => osstr.to_str().unwrap(),
                 None        => "no_ext"
             };
-            if(ext == "html"){
+
+            if ext == "html"{
                 let a = fs::read_to_string(fname);
                 match a{
-                    Ok(n)  => contents = n,
+                    Ok(n)  => contents = n.into_bytes(),
                     Err(_) => {
                         err_answer((403,"Forbidden"));
                         return;
                     },
                 }
-            } else{
+            } else if (ext == "jpeg")| (ext == "jpg"){
+                let mut a = match fs::read(fname) {
+                    Ok(n)  => n,
+                    Err(e) => {
+                        err_answer((403,"Forbidden"));
+                        println!("{}",e);
+                        return;
+                    },
+                };
+                contents = format!("Content-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n", a.len()).into_bytes();
+                contents.append(&mut a);
+            } else { 
                 err_answer((501,"Not implemented"));
                 return
             }//TODO images
