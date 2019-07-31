@@ -26,14 +26,14 @@ fn handle_connection(mut stream: TcpStream){
     let mut buffer = [0;512];
     stream.read(&mut buffer).unwrap();
 
-    let mut answer = move |Code: (u16,&str), mut contents: Vec<u8>|{
+    let mut answer = move |Code: (u16,&str),mut headers: String, mut contents: Vec<u8>|{
         if Code.0!=200 
             {println!("ERR: {} {}.",Code.0,Code.1);}
         //else 
            // {println!("SUC!");}
-        let mut response: Vec<u8> = format!("HTTP/1.1 {} {}\r\n\r\n", Code.0,Code.1).into_bytes();
+        let mut response: Vec<u8> = format!("HTTP/1.1 {} {}\r\n{}\r\n", Code.0,Code.1,headers).into_bytes();
         response.append(&mut contents);
-        println!("{}",String::from_utf8_lossy(&response));
+        //println!("{}",String::from_utf8_lossy(&response));
         match stream.peer_addr(){
             Ok(a) =>  println!("CON:Connection closed with {}", a),
             Err(e) => {
@@ -47,7 +47,8 @@ fn handle_connection(mut stream: TcpStream){
 
     let mut err_answer = |Code: (u16,&str)|{
         let contents = fs::read_to_string(format!("errors/{}.html",Code.0)).unwrap().into_bytes();
-        answer(Code,contents);
+        let h = String::new();
+        answer(Code,h,contents);
     };
 
     if !buffer.starts_with(b"GET")
@@ -78,6 +79,7 @@ fn handle_connection(mut stream: TcpStream){
         }
         
         let mut contents: Vec<u8> = Vec::new();
+        let mut headers = String::new();
         if address == "/"
         {
             println!("REQ: index.html");
@@ -112,14 +114,14 @@ fn handle_connection(mut stream: TcpStream){
                         return;
                     },
                 };
-                contents = format!("Content-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n", a.len()).into_bytes();
-                contents.append(&mut a);
+                headers = format!("Content-Type: image/jpeg\r\nContent-Length: {}\r\n", a.len());
+                contents = a;
             } else { 
                 err_answer((501,"Not implemented"));
                 return
             }//TODO images
         }
-        answer((200,"OK"),contents);
+        answer((200,"OK"),headers,contents);
     }
     
 
